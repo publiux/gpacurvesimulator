@@ -1,0 +1,205 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course GPA Monte Carlo Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1, h2 { margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }
+        input[type="number"] { width: 60px; padding: 4px; border: 1px solid #ccc; border-radius: 4px; }
+        button { background-color: #0066cc; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; display: block; width: 100%; }
+        button:hover { background-color: #0052a3; }
+        .error { color: #d9534f; font-weight: bold; margin-bottom: 15px; display: none; }
+        .result-box { text-align: center; margin-top: 20px; }
+        .gpa-number { font-size: 3em; font-weight: bold; color: #0066cc; margin: 10px 0; }
+        canvas { max-height: 300px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Course GPA Simulator</h1>
+        <p>Set the mandatory minimum and maximum percentage distribution for each grade. The simulation will run 5,000 times to estimate the average final course GPA.</p>
+        
+        <div id="error-message" class="error"></div>
+
+        <table id="gradeTable">
+            <thead>
+                <tr>
+                    <th>Grade</th>
+                    <th>Weight</th>
+                    <th>Min %</th>
+                    <th>Max %</th>
+                </tr>
+            </thead>
+            <tbody>
+                </tbody>
+        </table>
+
+        <button onclick="runAndVisualize()">Run Simulation (5,000 Iterations)</button>
+    </div>
+
+    <div class="card" id="results-card" style="display: none;">
+        <h2>Simulation Results</h2>
+        <div class="result-box">
+            <div>Expected Average GPA:</div>
+            <div class="gpa-number" id="final-gpa">--</div>
+        </div>
+        <canvas id="gpaChart"></canvas>
+    </div>
+
+    <script>
+        // Initial Data State
+        const defaultGrades = [
+            { id: 'A', weight: 4.0, min: 0, max: 15 },
+            { id: 'A-', weight: 3.67, min: 0, max: 20 },
+            { id: 'B+', weight: 3.33, min: 10, max: 30 },
+            { id: 'B', weight: 3.0, min: 10, max: 30 },
+            { id: 'B-', weight: 2.67, min: 0, max: 20 },
+            { id: 'C+', weight: 2.33, min: 0, max: 15 },
+            { id: 'C', weight: 2.0, min: 0, max: 10 },
+            { id: 'C-', weight: 1.67, min: 0, max: 5 },
+            { id: 'D', weight: 1.0, min: 0, max: 5 },
+            { id: 'F', weight: 0.0, min: 0, max: 5 }
+        ];
+
+        let chartInstance = null;
+
+        // Render Table
+        const tbody = document.querySelector('#gradeTable tbody');
+        defaultGrades.forEach(g => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${g.id}</strong></td>
+                <td>${g.weight.toFixed(2)}</td>
+                <td><input type="number" id="min-${g.id}" value="${g.min}" min="0" max="100"></td>
+                <td><input type="number" id="max-${g.id}" value="${g.max}" min="0" max="100"></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        function runAndVisualize() {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.style.display = 'none';
+
+            // Gather inputs
+            let constraints = defaultGrades.map(g => ({
+                grade: g.id,
+                weight: g.weight,
+                min: parseFloat(document.getElementById(`min-${g.id}`).value) || 0,
+                max: parseFloat(document.getElementById(`max-${g.id}`).value) || 0
+            }));
+
+            // Validate
+            const sumMins = constraints.reduce((sum, c) => sum + c.min, 0);
+            const sumMaxs = constraints.reduce((sum, c) => sum + c.max, 0);
+
+            if (sumMins > 100) {
+                errorDiv.innerText = `Error: Sum of minimums (${sumMins}%) exceeds 100%.`;
+                errorDiv.style.display = 'block';
+                return;
+            }
+            if (sumMaxs < 100) {
+                errorDiv.innerText = `Error: Sum of maximums (${sumMaxs}%) cannot reach 100%.`;
+                errorDiv.style.display = 'block';
+                return;
+            }
+            for(let c of constraints) {
+                if (c.min > c.max) {
+                    errorDiv.innerText = `Error: For grade ${c.grade}, Min is greater than Max.`;
+                    errorDiv.style.display = 'block';
+                    return;
+                }
+            }
+
+            // Run Simulation
+            const iterations = 5000;
+            let totalGPA = 0;
+            let gpaResults = [];
+
+            for (let i = 0; i < iterations; i++) {
+                let currentDist = constraints.map(c => c.min);
+                let remaining = 100 - sumMins;
+                let availableSpace = constraints.map(c => c.max - c.min);
+
+                while (remaining > 0.01) {
+                    let randomIdx = Math.floor(Math.random() * constraints.length);
+                    if (availableSpace[randomIdx] > 0) {
+                        let chunk = Math.min(availableSpace[randomIdx], Math.random() * remaining);
+                        currentDist[randomIdx] += chunk;
+                        availableSpace[randomIdx] -= chunk;
+                        remaining -= chunk;
+                    }
+                }
+
+                let simGPA = currentDist.reduce((sum, pct, idx) => sum + (pct / 100) * constraints[idx].weight, 0);
+                totalGPA += simGPA;
+                gpaResults.push(simGPA);
+            }
+
+            const averageGPA = totalGPA / iterations;
+            
+            // Display Results
+            document.getElementById('results-card').style.display = 'block';
+            document.getElementById('final-gpa').innerText = averageGPA.toFixed(3);
+
+            // Charting Logic (Histogram)
+            renderChart(gpaResults);
+        }
+
+        function renderChart(data) {
+            const ctx = document.getElementById('gpaChart').getContext('2d');
+            
+            // Create bins for histogram
+            const minGPA = Math.floor(Math.min(...data) * 10) / 10;
+            const maxGPA = Math.ceil(Math.max(...data) * 10) / 10;
+            const bins = 20;
+            const step = (maxGPA - minGPA) / bins;
+            
+            let frequencies = new Array(bins).fill(0);
+            let labels = [];
+
+            for(let i=0; i<bins; i++) {
+                labels.push((minGPA + (i*step)).toFixed(2));
+            }
+
+            data.forEach(val => {
+                let binIndex = Math.floor((val - minGPA) / step);
+                if (binIndex >= bins) binIndex = bins - 1; // Catch edge case
+                frequencies[binIndex]++;
+            });
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frequency of Simulated GPAs',
+                        data: frequencies,
+                        backgroundColor: 'rgba(0, 102, 204, 0.6)',
+                        borderColor: 'rgba(0, 102, 204, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Number of Iterations' } },
+                        x: { title: { display: true, text: 'Simulated GPA' } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
