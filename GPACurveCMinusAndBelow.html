@@ -25,9 +25,8 @@
 
     <div class="card">
         <h1>Course GPA Simulator</h1>
-        <p>Set the mandatory minimum and maximum percentage distribution for each grade. The simulation will run 5,000 times to estimate the average final course GPA.</p>
-        <p class="note">* Note: The weight for "C- & Below" is set to 0.89, which is the average of a C- (1.67), D (1.0), and F (0.0).</p>
-
+        <p>Set the mandatory minimum and maximum percentage distribution for each grade. The simulation will run 100,000 times to estimate the average final course GPA.</p>
+        <p class="note">* Note: The weight for "C- & Below" is set to 1.9, which more closely matches actual distributions.
         <div id="error-message" class="error"></div>
 
         <table id="gradeTable">
@@ -43,7 +42,7 @@
                 </tbody>
         </table>
 
-        <button onclick="runAndVisualize()">Run Simulation (5,000 Iterations)</button>
+        <button onclick="runAndVisualize()">Run Simulation (100,000 Iterations)</button>
     </div>
 
     <div class="card" id="results-card" style="display: none;">
@@ -58,14 +57,14 @@
     <script>
         // Updated Data State with Combined Bottom Category
         const defaultGrades = [
-            { id: 'A', weight: 4.0, min: 0, max: 15 },
-            { id: 'A-', weight: 3.67, min: 0, max: 20 },
-            { id: 'B+', weight: 3.33, min: 10, max: 30 },
-            { id: 'B', weight: 3.0, min: 10, max: 30 },
-            { id: 'B-', weight: 2.67, min: 0, max: 20 },
-            { id: 'C+', weight: 2.33, min: 0, max: 15 },
-            { id: 'C', weight: 2.0, min: 0, max: 10 },
-            { id: 'C- & Below', weight: 0.89, min: 0, max: 15 } // Combined category
+            { id: 'A', weight: 4.0, min: 10, max: 15 },
+            { id: 'A-', weight: 3.67, min: 10, max: 20 },
+            { id: 'B+', weight: 3.33, min: 15, max: 25 },
+            { id: 'B', weight: 3.0, min: 15, max: 25 },
+            { id: 'B-', weight: 2.67, min: 10, max: 15 },
+            { id: 'C+', weight: 2.33, min: 10, max: 15 },
+            { id: 'C', weight: 2.0, min: 10, max: 15 },
+            { id: 'C- & Below', weight: 1.9, min: 0, max: 15 } // Combined category
         ];
 
         let chartInstance = null;
@@ -118,7 +117,7 @@
             }
 
             // Run Simulation
-            const iterations = 5000;
+            const iterations = 100000;
             let totalGPA = 0;
             let gpaResults = [];
 
